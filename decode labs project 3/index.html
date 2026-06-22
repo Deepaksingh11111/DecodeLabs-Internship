@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tech Stack Recommender — DecodeLabs</title>
+<style>
+  :root {
+    --glass: rgba(255, 255, 255, 0.14);
+    --glass-strong: rgba(255, 255, 255, 0.22);
+    --glass-border: rgba(255, 255, 255, 0.35);
+    --ink: #0f1521;
+    --paper: #f5f3ec;
+    --violet: #7c5cff;
+    --cyan: #34d3e0;
+    --coral: #ff8a65;
+    --text-on-dark: #f4f2ff;
+    --text-dim: rgba(244, 242, 255, 0.68);
+    --mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+    --sans: "Sora", "Inter", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    font-family: var(--sans);
+    color: var(--text-on-dark);
+    background: linear-gradient(135deg, #1c1535 0%, #2a1f5c 28%, #3a2a7a 52%, #1f3a6b 76%, #16243f 100%);
+    background-attachment: fixed;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Ambient floating glass orbs for depth -- subtle, not distracting */
+  body::before, body::after {
+    content: "";
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(60px);
+    z-index: 0;
+    pointer-events: none;
+  }
+  body::before {
+    width: 480px; height: 480px;
+    background: radial-gradient(circle, rgba(124,92,255,0.45), transparent 70%);
+    top: -120px; left: -100px;
+  }
+  body::after {
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(52,211,224,0.32), transparent 70%);
+    bottom: -160px; right: -120px;
+  }
+
+  .topbar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 36px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .topbar .pill {
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 6px 14px;
+    border-radius: 999px;
+  }
+
+  header.hero {
+    position: relative;
+    z-index: 2;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 40px 32px 8px;
+    text-align: left;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin: 0 0 16px 0;
+  }
+  .eyebrow .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 12px var(--cyan);
+  }
+
+  h1 {
+    font-size: clamp(32px, 5vw, 50px);
+    line-height: 1.08;
+    margin: 0 0 16px 0;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+  }
+  h1 .grad {
+    background: linear-gradient(90deg, var(--cyan), var(--violet));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .lede {
+    font-size: 16.5px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    max-width: 600px;
+    margin: 0 0 28px 0;
+  }
+
+  main {
+    position: relative;
+    z-index: 2;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 32px 70px;
+  }
+
+  /* === The signature glass panel === */
+  .glass-panel {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 22px;
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    padding: 32px;
+    margin-top: 24px;
+  }
+
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .panel-head h2 {
+    font-size: 19px;
+    margin: 0;
+    font-weight: 700;
+    color: var(--text-on-dark);
+  }
+  .panel-head .meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--cyan);
+    margin-bottom: 10px;
+  }
+
+  /* Chip picker -- click skills instead of typing them */
+  .chip-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 4px 2px;
+  }
+  .chip-picker::-webkit-scrollbar { width: 6px; }
+  .chip-picker::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
+
+  .skill-chip {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-on-dark);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .skill-chip:hover {
+    background: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+  }
+  .skill-chip.selected {
+    background: linear-gradient(90deg, var(--violet), var(--cyan));
+    border-color: transparent;
+    color: #0f1521;
+    font-weight: 600;
+    box-shadow: 0 4px 14px rgba(124, 92, 255, 0.4);
+  }
+
+  .selected-tray {
+    min-height: 46px;
+    border: 1.5px dashed var(--glass-border);
+    border-radius: 14px;
+    padding: 10px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+    background: rgba(0,0,0,0.12);
+  }
+  .selected-tray .placeholder {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .selected-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(90deg, var(--violet), var(--cyan));
+    color: #0f1521;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 6px 6px 12px;
+    border-radius: 999px;
+  }
+  .selected-pill .x {
+    cursor: pointer;
+    width: 18px; height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(15, 21, 33, 0.18);
+    font-size: 12px;
+    line-height: 1;
+  }
+  .selected-pill .x:hover { background: rgba(15, 21, 33, 0.32); }
+
+  textarea#skills_hidden { display: none; }
+
+  .count-hint {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 4px 0 20px;
+  }
+  .count-hint.ok { color: #7be8a4; }
+  .count-hint.low { color: #ffb199; }
+
+  .field-row {
+    display: flex;
+    gap: 20px;
+    margin-top: 6px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .field-row .grow { flex: 1; min-width: 200px; }
+  .field-row .narrow { width: 120px; }
+
+  input[type="number"] {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 15px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.08);
+    color: var(--text-on-dark);
+  }
+  input[type="number"]:focus {
+    outline: 2px solid var(--cyan);
+    outline-offset: 1px;
+  }
+
+  button.run {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--violet), var(--cyan));
+    color: #0f1521;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(124, 92, 255, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  button.run:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(124, 92, 255, 0.5);
+  }
+  button.run:active { transform: translateY(0); }
+  button.run:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .error {
+    margin-top: 16px;
+    border: 1px solid rgba(255, 138, 101, 0.55);
+    background: rgba(255, 138, 101, 0.14);
+    color: #ffd9ca;
+    padding: 13px 16px;
+    border-radius: 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  details.vocab {
+    margin-top: 18px;
+  }
+  details.vocab summary {
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    list-style: none;
+  }
+  details.vocab summary::-webkit-details-marker { display: none; }
+  details.vocab summary::before { content: "+ "; color: var(--cyan); }
+  details.vocab[open] summary::before { content: "– "; }
+
+  /* Results */
+  .result-row {
+    display: grid;
+    grid-template-columns: 44px 1fr 130px;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .result-row:last-child { border-bottom: none; }
+
+  .rank-badge {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-weight: 800;
+    font-size: 14px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--glass-border);
+    color: var(--text-on-dark);
+  }
+  .result-row:first-child .rank-badge {
+    background: linear-gradient(135deg, var(--coral), var(--violet));
+    border: none;
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(255, 138, 101, 0.4);
+  }
+
+  .role-name {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+    color: var(--text-on-dark);
+  }
+  .overlap {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .overlap b { color: var(--cyan); font-weight: 600; }
+
+  .score-block { text-align: right; font-family: var(--mono); }
+  .score-pct { font-size: 19px; font-weight: 800; }
+  .score-bar-track {
+    width: 100%;
+    height: 7px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 6px;
+    margin-top: 7px;
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--violet), var(--cyan));
+  }
+  .result-row:first-child .score-bar-fill {
+    background: linear-gradient(90deg, var(--coral), var(--violet));
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 30px 10px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  footer {
+    position: relative;
+    z-index: 2;
+    max-width: 880px;
+    margin: 30px auto 0;
+    padding: 18px 32px 0;
+    border-top: 1px solid rgba(255,255,255,0.14);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: 600px) {
+    .result-row { grid-template-columns: 36px 1fr; }
+    .score-block { grid-column: 1 / -1; text-align: left; margin-top: 4px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <span>DecodeLabs · Industrial Training Kit</span>
+    <span class="pill">Project 03 — AI Recommendation Logic</span>
+  </div>
+
+  <header class="hero">
+    <p class="eyebrow"><span class="dot"></span>Content-based filtering engine</p>
+    <h1>Find your next <span class="grad">tech career</span>, matched by your skills</h1>
+    <p class="lede">
+      Tap the skills you already have. The engine turns them into a weighted vector and
+      measures the angle against {{ total_roles }} career paths using Cosine Similarity —
+      then hands you the closest matches, ranked.
+    </p>
+  </header>
+
+  <main>
+    <div class="glass-panel">
+      <div class="panel-head">
+        <h2>Pick your skills</h2>
+        <span class="meta">{{ all_tags|length }} skills available</span>
+      </div>
+
+      <form method="POST" id="recForm">
+        <label>Tap to add (3 minimum)</label>
+
+        <div class="selected-tray" id="selectedTray">
+          <span class="placeholder" id="trayPlaceholder">Your selected skills will appear here…</span>
+        </div>
+        <p class="count-hint low" id="countHint">0 selected — add at least 3 to continue</p>
+
+        <div class="chip-picker" id="chipPicker">
+          {% for tag in all_tags %}
+            <span class="skill-chip" data-skill="{{ tag }}">{{ tag }}</span>
+          {% endfor %}
+        </div>
+
+        <textarea id="skills_hidden" name="skills">{{ user_input }}</textarea>
+
+        <div class="field-row">
+          <div class="narrow">
+            <label for="top_n">Show top</label>
+            <input type="number" id="top_n" name="top_n" min="1" max="20" value="{{ top_n }}">
+          </div>
+          <div class="grow" style="text-align:right;">
+            <button type="submit" class="run" id="runBtn" disabled>Find my matches →</button>
+          </div>
+        </div>
+
+        {% if error %}
+          <div class="error">{{ error }}</div>
+        {% endif %}
+      </form>
+
+      <details class="vocab">
+        <summary>Browse the full skill list ({{ all_tags|length }} skills) and {{ all_roles|length }} career paths covered</summary>
+        <p style="font-family: var(--mono); font-size: 12px; color: var(--text-dim); margin-top: 14px; line-height: 1.8;">
+          {{ all_roles|join(' · ') }}
+        </p>
+      </details>
+    </div>
+
+    {% if results %}
+    <div class="glass-panel">
+      <div class="panel-head">
+        <h2>Your top {{ results|length }} matches</h2>
+        <span class="meta">based on: {{ user_input }}</span>
+      </div>
+
+      {% for r in results %}
+      <div class="result-row">
+        <div class="rank-badge">{{ loop.index }}</div>
+        <div>
+          <p class="role-name">{{ r.role }}</p>
+          {% if r.overlap %}
+            <p class="overlap">You both share <b>{{ r.overlap|join(', ') }}</b></p>
+          {% else %}
+            <p class="overlap">Matched by overall direction — no exact skill overlap</p>
+          {% endif %}
+        </div>
+        <div class="score-block">
+          <div class="score-pct">{{ r.pct }}%</div>
+          <div class="score-bar-track">
+            <div class="score-bar-fill" style="width: {{ r.pct }}%;"></div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% elif error is none and user_input %}
+    <div class="glass-panel">
+      <div class="empty-state">No matches yet — try adjusting your skills above.</div>
+    </div>
+    {% endif %}
+  </main>
+
+  <footer>
+    <span>Engine: TF-IDF + Cosine Similarity (pure Python)</span>
+    <span>decodelabs.tech</span>
+  </footer>
+
+  <script>
+    (function () {
+      const picker = document.getElementById('chipPicker');
+      const tray = document.getElementById('selectedTray');
+      const placeholder = document.getElementById('trayPlaceholder');
+      const hiddenInput = document.getElementById('skills_hidden');
+      const countHint = document.getElementById('countHint');
+      const runBtn = document.getElementById('runBtn');
+
+      // Pre-select skills already submitted (so a re-render keeps state)
+      const preselected = hiddenInput.value
+        .split(',')
+        .map(s => s.trim().toLowerCase())
+        .filter(Boolean);
+
+      const selected = new Set();
+
+      function syncHiddenField() {
+        hiddenInput.value = Array.from(selected).join(', ');
+      }
+
+      function renderTray() {
+        tray.querySelectorAll('.selected-pill').forEach(el => el.remove());
+        if (selected.size === 0) {
+          placeholder.style.display = 'inline';
+        } else {
+          placeholder.style.display = 'none';
+          selected.forEach(skill => {
+            const pill = document.createElement('span');
+            pill.className = 'selected-pill';
+            pill.innerHTML = skill + ' <span class="x" data-skill="' + skill + '">×</span>';
+            tray.appendChild(pill);
+          });
+        }
+      }
+
+      function updateHint() {
+        const n = selected.size;
+        if (n < 3) {
+          countHint.textContent = n + ' selected — add at least 3 to continue';
+          countHint.className = 'count-hint low';
+          runBtn.disabled = true;
+        } else {
+          countHint.textContent = n + ' selected — ready to go';
+          countHint.className = 'count-hint ok';
+          runBtn.disabled = false;
+        }
+      }
+
+      function toggleSkill(skill) {
+        const chip = picker.querySelector('.skill-chip[data-skill="' + cssEscape(skill) + '"]');
+        if (selected.has(skill)) {
+          selected.delete(skill);
+          if (chip) chip.classList.remove('selected');
+        } else {
+          selected.add(skill);
+          if (chip) chip.classList.add('selected');
+        }
+        renderTray();
+        updateHint();
+        syncHiddenField();
+      }
+
+      function cssEscape(str) {
+        return str.replace(/(["\\])/g, '\\$1');
+      }
+
+      picker.addEventListener('click', function (e) {
+        const chip = e.target.closest('.skill-chip');
+        if (!chip) return;
+        toggleSkill(chip.dataset.skill);
+      });
+
+      tray.addEventListener('click', function (e) {
+        const x = e.target.closest('.x');
+        if (!x) return;
+        toggleSkill(x.dataset.skill);
+      });
+
+      // restore previous selections on page load
+      preselected.forEach(skill => {
+        const chip = picker.querySelector('.skill-chip[data-skill="' + cssEscape(skill) + '"]');
+        if (chip) {
+          selected.add(skill);
+          chip.classList.add('selected');
+        }
+      });
+      renderTray();
+      updateHint();
+      syncHiddenField();
+    })();
+  </script>
+
+</body>
+</html>
